@@ -10,11 +10,8 @@ stdout.write('Hello there! Input text:\n');
 stdin.on('data', chunk => {
   if (chunk.toString().trim().toLowerCase() === 'exit') process.exit();
 
-  output.write(chunk)
+  output.write(chunk);
 });
 
 process.on('exit', () => stdout.write('Thank you! Have a nice day.'));
 process.on('SIGINT', () => process.exit());
-
-
-

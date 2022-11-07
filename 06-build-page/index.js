@@ -6,12 +6,11 @@ const assetsSrc = path.join(__dirname, 'assets');
 const assetsDest = path.join(projectDir, 'assets');
 const indexDest = path.join(projectDir, 'index.html');
 
-fs.mkdir(projectDir, {recursive: true})
-  .then(assembleStyles())
-  .then(copyDir(assetsSrc, assetsDest))
-  .then(assembleHTML());
-  
-
+fs.mkdir(projectDir, {recursive: true}).then(() => {
+    assembleStyles();
+    copyDir(assetsSrc, assetsDest);
+    assembleHTML();
+  })
 
 function assembleStyles() {
   const src = path.join(__dirname, 'styles');
@@ -34,7 +33,7 @@ function assembleStyles() {
 }
 
 function copyDir(src, dest) {
-  const copyFile = item => {
+  const copy = item => {
     const file = path.join(src, item.name);
     const copy = path.join(dest, item.name);
     if (item.isFile()) {
@@ -45,27 +44,42 @@ function copyDir(src, dest) {
 fs.rm(dest, {recursive: true, force: true})
   .then(() => fs.mkdir(dest, {recursive: true}))
   .then(() => fs.readdir(src, {withFileTypes: true}))
-  .then(files => files.forEach(copyFile));
+  .then(files => files.forEach(copy));
 }
 
 function assembleHTML() {
-  const isTemplate = line => line.trim().startsWith('{{');
-  const getComponentContents = template => {
-    const dir = path.join(__dirname, 'components', `${template}.html`);
-    return fs.readFile(dir, 'utf-8');
-  }
-  const getComponentName = line => line.trim().slice(2, -2);
-
   fs.readFile(path.join(__dirname, 'template.html'), 'utf-8')
-    .then(res => {
-      const lines = res.split('\n');
+    .then(replaceTemplates)
+    .then(writeHTML); 
+}
 
-      return lines.map(line => {
-        if (isTemplate(line)) return getComponentContents(getComponentName(line));
-        return Promise.resolve(line);
-      });
-    })
-    .then(promisesArray => {
-      Promise.all(promisesArray).then(res => fs.writeFile(indexDest, res));
-    }); 
+function getComponentContents(template) {
+  const name = template.trim().slice(2, -2);
+  const indent = template.indexOf('{');
+  const dir = path.join(__dirname, 'components', `${name}.html`);
+  const content = fs.readFile(dir, 'utf-8');
+  
+  return content.then(res => {
+    return res
+      .split('\n')
+      .map(line => line.padStart(line.length + indent, ' '))
+      .join('\n');
+  });
+}
+
+function replaceTemplates(file) {
+  const isTemplate = line => line.trim().startsWith('{{');
+  const lines = file.split('\n');
+
+  return lines.map(line => {
+    if (isTemplate(line)) return getComponentContents(line);
+    return Promise.resolve(line);
+  });
+}
+
+function writeHTML(content) {
+  Promise.all(content).then(res => {
+    const data = res.join('\n');
+    fs.writeFile(indexDest, data);
+  });
 }
